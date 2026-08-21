@@ -1,0 +1,25 @@
+{
+  "backends": [
+    {
+      "name": "engine",
+      "kind": "engine-ipc",
+      "path": "C:/path/to/Malbolge-Engine/malbolge-ipc.exe",
+      "comment": "JSONL IPC server; reports status, steps and output",
+      "enabled": true
+    },
+    {
+      "name": "oracle",
+      "kind": "oracle-python",
+      "path": "C:/path/to/malbolge-oracle",
+      "comment": "directory containing oracle.py; reports the full machine state",
+      "enabled": true
+    },
+    {
+      "name": "rust",
+      "kind": "rust-cli",
+      "path": "C:/path/to/malbolge-rs/target/release/malbolge.exe",
+      "comment": "sprang/malbolge-rs, MIT; reports stdout and termination only",
+      "enabled": true
+    }
+  ]
+}
