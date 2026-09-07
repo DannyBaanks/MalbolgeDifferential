@@ -1,7 +1,7 @@
 # malbolge-differential
 
-**Run the same Malbolge program on independent implementations and see exactly
-where they agree.**
+**Corre el mismo programa Malbolge en implementaciones independientes y ve exactamente
+donde coinciden.**
 
 ```console
 $ python -m mdiff.diff corpus/hello_world.mb
@@ -24,94 +24,94 @@ Program: hello_world.mb
 RESULT: CONSISTENT
 ```
 
-**This repository contains no Malbolge interpreter.** It points at whichever
-ones you have built and compares what they do. Each backend runs the program
-itself; nothing goes through anything else.
+**Este repositorio NO contiene ningun interprete de Malbolge.** Apunta a los
+que tu tengas construidos y compara lo que hacen. Cada backend corre el programa
+el mismo; nada pasa por nada mas.
 
-## Why
+## Por que
 
-Malbolge implementations disagree in ways that are invisible until you put them
-side by side. Not on hello-world — on what happens at EOF, on the state after a
-halt, on **how the program gets into memory in the first place**.
+Las implementaciones de Malbolge discrepan de formas que son invisibles hasta que las pones
+lado a lado. No en hello-world — en que pasa al EOF, en el estado despues de un
+halt, en **como el programa llega a la memoria en primer lugar**.
 
-That last one turned out to be the interesting part. See
+Ese ultimo resulto ser la parte interesante. Ver
 [`findings/D4_loading_is_not_specified.md`](findings/D4_loading_is_not_specified.md):
-the semantics everyone cites, Iizawa (2005) Appendix C, is
-`void exec( unsigned short *mem )` — it receives memory **already loaded** and
-says nothing about how. So every implementation decided for itself, and they
-decided differently: one fills the tail of memory, one zeroed it, one skips
-whitespace in the source and one does not. Programs that step past their own
-last cell are not running the same machine.
+la semantica que todos citan, Iizawa (2005) Appendix C, es
+`void exec( unsigned short *mem )` — recibe la memoria **ya cargada** y
+no dice nada sobre como. Entonces cada implementacion decidio por su cuenta, y
+decidieron diferente: una llena la cola de la memoria, otra la pone en cero, una
+salta whitespace en el fuente y otra no. Programas que pasan de su propia
+ultima celda no estan corriendo la misma maquina.
 
-That was found on the first real comparison this harness ran, and it produced a
-fix in one of the backends.
+Eso se encontro en la primera comparacion real que corrio este harness, y produjo un
+fix en uno de los backends.
 
-## Three verdicts, not two
+## Tres veredictos, no dos
 
 ```
-CONSISTENT     the backends that could answer, agreed
-DIVERGENCE     they could answer, and disagreed
-INCONCLUSIVE   too few could answer to tell
+CONSISTENT     los backends que pudieron responder, coincidieron
+DIVERGENCE     pudieron responder, y discreparon
+INCONCLUSIVE   muy pocos pudieron responder para saber
 ```
 
-The third exists because most of what goes wrong in differential testing is not
-a semantic difference. A runtime hit its step limit; another has no limit. One
-refused to load the program. A field is unavailable in one implementation.
-Reporting any of that as a divergence teaches people to ignore the tool.
+El tercero existe porque la mayoria de lo que sale mal en prueba diferencial no es
+una diferencia semantica. Un runtime toco su limite de pasos; otro no tiene limite. Uno
+se nego a cargar el programa. Un campo no esta disponible en una implementacion.
+Reportar cualquiera de eso como divergencia ensena a la gente a ignorar la herramienta.
 
-Two more things it refuses to do:
+Dos cosas mas que se niega a hacer:
 
-**It never fabricates a field.** An interpreter that prints and exits cannot
-report a step count. That is recorded as unavailable, not as zero, and fields
-fewer than two backends can report are left out of the comparison entirely.
+**Nunca fabrica un campo.** Un interprete que imprime y sale no puede
+reportar un conteo de pasos. Eso se registra como no disponible, no como cero, y campos
+que menos de dos backends pueden reportar se dejan fuera de la comparacion completamente.
 
-**It separates encoding from semantics.** A runtime writing bytes through a
-UTF-8 encoder emits two bytes where one writing raw emits one, for anything
-≥ 128. The machines agree; the streams do not. That is reported as
-`kind="encoding"`, apart from a genuine difference in what was printed.
+**Separa encoding de semantica.** Un runtime que escribe bytes por un
+encoder UTF-8 emite dos bytes donde uno que escribe raw emite uno, para cualquier cosa
+≥ 128. Las maquinas coinciden; los flujos no. Eso se reporta como
+`kind="encoding"`, aparte de una diferencia real en lo que se imprimo.
 
 ## Setup
 
 ```sh
-cp backends.example.json backends.json     # then edit the paths
+cp backends.example.json backends.json     # luego edita las rutas
 python -m mdiff.diff corpus/hello_world.mb
 ```
 
-Three kinds of backend are supported, matching how each implementation exposes
-itself:
+Se soportan tres tipos de backend, igualando como cada implementacion se expone
+a si misma:
 
-| kind | For | Reports |
+| tipo | Para | Reporta |
 |---|---|---|
-| `engine-ipc` | an interpreter speaking JSONL over stdin/stdout | status, steps, output |
-| `oracle-python` | a directory containing `oracle.py` | the full machine state |
-| `rust-cli` | a CLI taking a file path | stdout and termination |
+| `engine-ipc` | un interprete que habla JSONL por stdin/stdout | status, steps, output |
+| `oracle-python` | un directorio que contiene `oracle.py` | el estado completo de la maquina |
+| `rust-cli` | un CLI que toma una ruta de archivo | stdout y terminacion |
 
-Adding a fourth is a function in `mdiff/backends.py` that returns an `Outcome`
-and declares what it cannot report.
+Agregar un cuarto es una funcion en `mdiff/backends.py` que retorna un `Outcome`
+y declara que no puede reportar.
 
-## Evidence
+## Evidencia
 
-Every run writes a JSON file with each backend's outcome, the comparison, the
-program hash and the conditions — because a divergence you cannot reproduce is
-an anecdote. `--no-evidence` turns it off.
+Cada corrida escribe un archivo JSON con el resultado de cada backend, la comparacion, el
+hash del programa y las condiciones — porque una divergencia que no puedes reproducir es
+una anecdotica. `--no-evidence` lo apaga.
 
-Exit code is `1` only for `DIVERGENCE`. `INCONCLUSIVE` exits `0`: it is a normal
-result, not an error.
+El exit code es `1` solo para `DIVERGENCE`. `INCONCLUSIVE` sale con `0`: es un resultado
+normal, no un error.
 
-## Tests
+## Pruebas
 
 ```sh
 python -m pytest tests/ -v
 ```
 
-They cover the comparator, which is where the judgement lives: what counts as
-agreement when one backend cannot report a field, why a timeout is inconclusive
-rather than divergent, and how a UTF-8 artefact is told apart from a real
-difference in output.
+Cubren el comparador, que es donde vive el juicio: que cuenta como
+coincidencia cuando un backend no puede reportar un campo, por que un timeout es inconcluso
+en vez de divergente, y como se distingue un artefacto UTF-8 de una diferencia
+real en la salida.
 
-## Licence
+## Licencia
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. Ver [`LICENSE`](LICENSE).
 
-The interpreters this harness drives are separate projects with their own
-licences and are not included here.
+Los interpretes que este harness maneja son proyectos separados con sus propias
+licencias y no se incluyen aqui.
