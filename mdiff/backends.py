@@ -224,24 +224,14 @@ def run_rust_cli(backend: Backend, program: str, stdin: str = "",
 # Rustbolge — a CLI that reports the full machine state as JSON on stderr
 # --------------------------------------------------------------------------
 
-def run_rustbolge_cli(backend: Backend, program: str, stdin: str = "",
-                      max_steps: int = DEFAULT_MAX_STEPS,
-                      timeout: float = DEFAULT_TIMEOUT_S) -> Outcome:
-    """Run Rustbolge (Rust VM, vm.c-semantics) via its CLI.
+def _run_reporter_cli(command: list[str], backend: Backend, program: str,
+                      stdin: str, max_steps: int, timeout: float) -> Outcome:
+    """Shared driver for the "reporter" CLIs (rustbolge, swiftbolge, javolge).
 
-    Differences from `rust-cli`, all established by measurement on
-    Rustbolge 0.1.0:
-
-    - it accepts a step limit as the second CLI argument, so no wall-clock
-      killing is needed for looping programs (the wall timeout stays as a
-      safety net only);
-    - besides stdout it reports steps, status and the final a/c/d registers
-      as JSON on stderr (`--json`), so nothing is marked unavailable;
-    - like malbolge.c it appends one newline after non-empty output; the
-      adapter strips exactly one trailing newline so stdout is comparable
-      with backends that do not add framing;
-    - a load failure (byte outside 33..126 that is not whitespace) exits 2
-      with an `invalid character` message — that maps to INVALID.
+    They all speak the same protocol: a program file + step limit as
+    arguments, raw bytes on stdout (with one framing newline), and a JSON
+    report on stderr (`--json`) with steps/status/final a-c-d. So one parser
+    serves all three; only the invoked command differs.
     """
     import tempfile
 
@@ -250,7 +240,7 @@ def run_rustbolge_cli(backend: Backend, program: str, stdin: str = "",
         handle.write(program)
         program_path = handle.name
 
-    command = [backend.path, program_path, str(max_steps), "--json"]
+    command = list(command) + [program_path, str(max_steps), "--json"]
     started = time.perf_counter()
     proc = subprocess.Popen(command, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -266,7 +256,7 @@ def run_rustbolge_cli(backend: Backend, program: str, stdin: str = "",
     Path(program_path).unlink(missing_ok=True)
 
     stderr_text = raw_err.decode("utf-8", "replace")
-    provenance = {"command": [backend.path, "<program>", str(max_steps), "--json"],
+    provenance = {"command": command + ["<program>", str(max_steps), "--json"],
                   "kind": backend.kind, "wall_s": round(elapsed, 4),
                   "exit_code": proc.returncode,
                   "note": "stdout newline framing stripped (1 trailing LF)"}
@@ -318,11 +308,29 @@ def run_rustbolge_cli(backend: Backend, program: str, stdin: str = "",
                    provenance=provenance)
 
 
+def run_rustbolge_cli(backend: Backend, program: str, stdin: str = "",
+                      max_steps: int = DEFAULT_MAX_STEPS,
+                      timeout: float = DEFAULT_TIMEOUT_S) -> Outcome:
+    """Rustbolge / Swiftbolge: single executable, report-on-stderr CLI."""
+    return _run_reporter_cli([backend.path], backend, program, stdin,
+                             max_steps, timeout)
+
+
+def run_javolge_cli(backend: Backend, program: str, stdin: str = "",
+                    max_steps: int = DEFAULT_MAX_STEPS,
+                    timeout: float = DEFAULT_TIMEOUT_S) -> Outcome:
+    """Javolge: a JVM class reached via classpath (no self-contained binary)."""
+    return _run_reporter_cli(
+        ["java", "-cp", backend.path, "com.dannybaanks.javolge.Main"],
+        backend, program, stdin, max_steps, timeout)
+
+
 RUNNERS = {
     "engine-ipc": run_engine_ipc,
     "oracle-python": run_oracle,
     "rust-cli": run_rust_cli,
     "rustbolge-cli": run_rustbolge_cli,
+    "javolge-cli": run_javolge_cli,
 }
 
 

@@ -86,6 +86,7 @@ a si misma:
 | `oracle-python` | un directorio que contiene `oracle.py` | el estado completo de la maquina |
 | `rust-cli` | un CLI que toma una ruta de archivo | stdout y terminacion |
 | `rustbolge-cli` | [Rustbolge](../Rustbolge) — CLI con limite de steps + reporte JSON | stdout, terminacion, steps, a/c/d finales |
+| `javolge-cli` | [Javolge](../Javolge) — VM en Java (mismo protocolo, via classpath) | stdout, terminacion, steps, a/c/d finales |
 
 Agregar un cuarto es una funcion en `mdiff/backends.py` que retorna un `Outcome`
 y declara que no puede reportar.
