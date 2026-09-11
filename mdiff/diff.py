@@ -43,7 +43,7 @@ def write_evidence(directory: Path, program: Path, program_text: str,
                    outcomes: list[Outcome], comparison, stdin: str,
                    max_steps: int, timeout: float) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     target = directory / f"{program.stem}.{stamp}.json"
     target.write_text(json.dumps({
         "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

@@ -220,10 +220,109 @@ def run_rust_cli(backend: Backend, program: str, stdin: str = "",
                    unavailable=("steps", "a", "c", "d"), provenance=provenance)
 
 
+# --------------------------------------------------------------------------
+# Rustbolge — a CLI that reports the full machine state as JSON on stderr
+# --------------------------------------------------------------------------
+
+def run_rustbolge_cli(backend: Backend, program: str, stdin: str = "",
+                      max_steps: int = DEFAULT_MAX_STEPS,
+                      timeout: float = DEFAULT_TIMEOUT_S) -> Outcome:
+    """Run Rustbolge (Rust VM, vm.c-semantics) via its CLI.
+
+    Differences from `rust-cli`, all established by measurement on
+    Rustbolge 0.1.0:
+
+    - it accepts a step limit as the second CLI argument, so no wall-clock
+      killing is needed for looping programs (the wall timeout stays as a
+      safety net only);
+    - besides stdout it reports steps, status and the final a/c/d registers
+      as JSON on stderr (`--json`), so nothing is marked unavailable;
+    - like malbolge.c it appends one newline after non-empty output; the
+      adapter strips exactly one trailing newline so stdout is comparable
+      with backends that do not add framing;
+    - a load failure (byte outside 33..126 that is not whitespace) exits 2
+      with an `invalid character` message — that maps to INVALID.
+    """
+    import tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".mal", delete=False,
+                                     encoding="latin-1", newline="") as handle:
+        handle.write(program)
+        program_path = handle.name
+
+    command = [backend.path, program_path, str(max_steps), "--json"]
+    started = time.perf_counter()
+    proc = subprocess.Popen(command, stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        raw_out, raw_err = proc.communicate(stdin.encode("latin-1"),
+                                            timeout=timeout)
+        wall_timeout = False
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raw_out, raw_err = proc.communicate()
+        wall_timeout = True
+    elapsed = time.perf_counter() - started
+    Path(program_path).unlink(missing_ok=True)
+
+    stderr_text = raw_err.decode("utf-8", "replace")
+    provenance = {"command": [backend.path, "<program>", str(max_steps), "--json"],
+                  "kind": backend.kind, "wall_s": round(elapsed, 4),
+                  "exit_code": proc.returncode,
+                  "note": "stdout newline framing stripped (1 trailing LF)"}
+
+    if proc.returncode == 2 and "invalid character" in stderr_text:
+        return Outcome(backend=backend.name, output=b"", halted=False,
+                       status="INVALID",
+                       error=stderr_text.strip().splitlines()[-1],
+                       unavailable=("steps", "a", "c", "d"),
+                       provenance=provenance)
+
+    report = None
+    for line in stderr_text.splitlines():
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                report = json.loads(line)
+            except json.JSONDecodeError:
+                pass
+
+    # Strip exactly one trailing newline framing (see docstring).
+    output = bytes(raw_out)
+    if output.endswith(b"\r\n"):
+        output = output[:-2]
+    elif output.endswith(b"\n"):
+        output = output[:-1]
+
+    if wall_timeout:
+        return Outcome(backend=backend.name, output=output, halted=False,
+                       status="TIMEOUT",
+                       error=f"wall-clock timeout after {timeout}s",
+                       unavailable=("steps", "a", "c", "d"),
+                       provenance=provenance)
+
+    if report is None:
+        return Outcome(backend=backend.name, output=output, halted=False,
+                       status="ERROR",
+                       error="no JSON report on stderr: " + stderr_text.strip(),
+                       unavailable=("steps", "a", "c", "d"),
+                       provenance=provenance)
+
+    provenance["halt_reason"] = report.get("halt_reason")
+    status = "OK" if report.get("status") == "HALTED" else "TIMEOUT"
+    final = report.get("final") or {}
+    return Outcome(backend=backend.name, output=output,
+                   halted=status == "OK", status=status,
+                   steps=report.get("steps"),
+                   a=final.get("a"), c=final.get("c"), d=final.get("d"),
+                   provenance=provenance)
+
+
 RUNNERS = {
     "engine-ipc": run_engine_ipc,
     "oracle-python": run_oracle,
     "rust-cli": run_rust_cli,
+    "rustbolge-cli": run_rustbolge_cli,
 }
 
 

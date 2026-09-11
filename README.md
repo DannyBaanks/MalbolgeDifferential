@@ -85,6 +85,7 @@ itself:
 | `engine-ipc` | an interpreter speaking JSONL over stdin/stdout | status, steps, output |
 | `oracle-python` | a directory containing `oracle.py` | the full machine state |
 | `rust-cli` | a CLI taking a file path | stdout and termination |
+| `rustbolge-cli` | [Rustbolge](../Rustbolge) — CLI with step limit + JSON report | stdout, termination, steps, final a/c/d |
 
 Adding a fourth is a function in `mdiff/backends.py` that returns an `Outcome`
 and declares what it cannot report.
