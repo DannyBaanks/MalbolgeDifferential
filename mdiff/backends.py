@@ -325,12 +325,21 @@ def run_javolge_cli(backend: Backend, program: str, stdin: str = "",
         backend, program, stdin, max_steps, timeout)
 
 
+def run_cobolge_cli(backend: Backend, program: str, stdin: str = "",
+                    max_steps: int = DEFAULT_MAX_STEPS,
+                    timeout: float = DEFAULT_TIMEOUT_S) -> Outcome:
+    """Cobolge: GnuCOBOL 3.2 Malbolge engine, reporter CLI protocol."""
+    return _run_reporter_cli([backend.path], backend, program, stdin,
+                             max_steps, timeout)
+
+
 RUNNERS = {
     "engine-ipc": run_engine_ipc,
     "oracle-python": run_oracle,
     "rust-cli": run_rust_cli,
     "rustbolge-cli": run_rustbolge_cli,
     "javolge-cli": run_javolge_cli,
+    "cobolge-cli": run_cobolge_cli,
 }
 
 
