@@ -1,7 +1,12 @@
-﻿# malbolge-differential
+# malbolge-differential v2.0 — Harness de Verificación Diferencial Multi-Oráculo
+
+[![Version](https://img.shields.io/badge/version-2.0-blue.svg)](https://github.com/DannyBaanks/malbolge-differential)
+[![Differential](https://img.shields.io/badge/consensus-multi--oracle-brightgreen.svg)]()
 
 **Corre el mismo programa Malbolge en implementaciones independientes y ve exactamente
 donde coinciden.**
+
+Harness central de la **Flota de Consenso Multi-Oráculo v2.0** del ecosistema Malbolge de ISyCo.
 
 ```console
 $ python -m mdiff.diff corpus/hello_world.mb
